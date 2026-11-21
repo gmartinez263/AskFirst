@@ -11,7 +11,14 @@ import type { CollectionSchema } from 'deepspace/schema'
 export const requestsSchema: CollectionSchema = {
   name: 'requests',
   columns: [
-    { name: 'childId', storage: 'text', interpretation: 'plain', required: true },
+    {
+      name: 'childId',
+      storage: 'text',
+      interpretation: 'plain',
+      userBound: true,
+      immutable: true,
+      required: true,
+    },
     { name: 'childName', storage: 'text', interpretation: 'plain', required: true },
     { name: 'title', storage: 'text', interpretation: 'plain', required: true },
     { name: 'url', storage: 'text', interpretation: { kind: 'url' }, required: true },
