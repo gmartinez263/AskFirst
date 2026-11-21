@@ -36,6 +36,8 @@ export default function Navigation() {
 
   const profileReady = !isSignedIn || (!userLoading && !!user)
   const userRole = (user?.role ?? 'anonymous') as Role | 'anonymous'
+  // Hide the navbar entirely on pages that manage their own headers
+  const hideNavbar = ['/login', '/portal', '/parent'].includes(location.pathname)
 
   // Close the mobile menu when navigating
   useEffect(() => {
@@ -52,7 +54,9 @@ export default function Navigation() {
 
   const navLink = (item: (typeof nav)[number]) => {
     const active = location.pathname.startsWith(item.path)
-    return (
+    if (hideNavbar) return null
+
+  return (
       <Link
         key={item.path}
         to={item.path}
@@ -66,6 +70,8 @@ export default function Navigation() {
       </Link>
     )
   }
+
+  if (hideNavbar) return null
 
   return (
     <>
