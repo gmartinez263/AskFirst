@@ -7,6 +7,7 @@
  */
 
 import type { Hono } from 'hono'
+import { getCookie } from 'hono/cookie'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import {
   apiWorkerFetch,
@@ -31,6 +32,9 @@ import {
 import type { ExpoAuthBridgeOptions, JwtVerifierConfig, VerifyResult } from 'deepspace/worker'
 import { integrations } from '../integrations.js'
 import type { AppContext, Env } from '../../worker.js'
+
+const OAUTH_RETURN_COOKIE = 'askfirst_oauth_return'
+const OAUTH_RETURN_COOKIE_PATH = '/api/auth/oauth-complete'
 
 function jwtConfig(env: Env): JwtVerifierConfig {
   return { publicKey: env.AUTH_JWT_PUBLIC_KEY, issuer: env.AUTH_JWT_ISSUER }
@@ -89,10 +93,20 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
     const appOrigin = new URL(c.req.url).origin
     const authOrigin = new URL(c.env.AUTH_WORKER_URL).origin
-
-    return c.redirect(
-      `${authOrigin}/login/social?provider=${encodeURIComponent(provider)}&returnTo=${encodeURIComponent(appOrigin)}`,
-    )
+    // Only the parent entry flow needs a non-default destination. Keep this
+    // allowlist narrow so the OAuth callback cannot become an open redirect.
+    const returnToParent = c.req.query('returnTo') === '/parent'
+    const headers = new Headers({
+      Location: `${authOrigin}/login/social?provider=${encodeURIComponent(provider)}&returnTo=${encodeURIComponent(appOrigin)}`,
+    })
+    if (returnToParent) {
+      const secure = new URL(c.req.url).protocol === 'https:' ? '; Secure' : ''
+      headers.append(
+        'Set-Cookie',
+        `${OAUTH_RETURN_COOKIE}=%2Fparent; Path=${OAUTH_RETURN_COOKIE_PATH}; HttpOnly; SameSite=Lax; Max-Age=300${secure}`,
+      )
+    }
+    return new Response(null, { status: 302, headers })
   })
 
   app.get('/api/auth/oauth-complete', async (c) => {
@@ -101,12 +115,12 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     }
     const code = c.req.query('code')
     const appOrigin = new URL(c.req.url).origin
-    // Land the signed-in user in the app, not on the static landing. `/` is a
-    // static page (no auth/realtime providers), so redirecting there after auth
-    // would strand the user; `/home` is the dynamic app boundary.
+    // Return the signed-in user to the requested app route, or `/home` by
+    // default. `/` is static and has no auth/realtime providers.
     const appHome = `${appOrigin}/home`
+    const returnTo = getCookie(c, OAUTH_RETURN_COOKIE) === '/parent' ? `${appOrigin}/parent` : appHome
 
-    if (!code) return c.redirect(appHome)
+    if (!code) return c.redirect(returnTo)
 
     const res = await authWorkerFetch(c.env, '/api/auth/exchange-code', {
       method: 'POST',
@@ -114,18 +128,22 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
       body: JSON.stringify({ code }),
     })
 
-    if (!res.ok) return c.redirect(appHome)
+    if (!res.ok) return c.redirect(returnTo)
     const data = (await res.json()) as { sessionToken?: string }
-    if (!data.sessionToken) return c.redirect(appHome)
+    if (!data.sessionToken) return c.redirect(returnTo)
     const sessionToken = data.sessionToken
+    const secure = new URL(c.req.url).protocol === 'https:' ? '; Secure' : ''
+    const headers = new Headers({ Location: returnTo })
+    headers.append(
+      'Set-Cookie',
+      `${SESSION_COOKIE}=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
+    )
+    headers.append(
+      'Set-Cookie',
+      `${OAUTH_RETURN_COOKIE}=; Path=${OAUTH_RETURN_COOKIE_PATH}; HttpOnly; SameSite=Lax; Max-Age=0${secure}`,
+    )
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: appHome,
-        'Set-Cookie': `${SESSION_COOKIE}=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
-      },
-    })
+    return new Response(null, { status: 302, headers })
   })
 
   app.all('/api/auth/sign-out', async (c) => {

@@ -30,13 +30,11 @@ export function BiometricLoginModal({
   )
   const [pin, setPin] = useState<string>('')
   const [pinError, setPinError] = useState<string | null>(null)
-  const [parentPass, setParentPass] = useState<string>('')
 
   // Reset state on close
   const handleClose = () => {
     setPin('')
     setPinError(null)
-    setParentPass('')
     setStep(boundChildId ? 'child_pin' : 'role_select')
     onClose()
   }
@@ -118,7 +116,7 @@ export function BiometricLoginModal({
           </div>
         )}
 
-        {/* Step 2a: Parent Password / Verification */}
+        {/* Step 2a: Parent Google sign-in */}
         {step === 'parent_auth' && (
           <div className="flex flex-col">
             <button
@@ -134,34 +132,13 @@ export function BiometricLoginModal({
                 <Shield className="h-6 w-6" />
               </div>
               <h2 className="text-lg font-bold">Parent Sign-In</h2>
-              <p className="text-xs text-muted-foreground">
-                Enter your password or confirm biometrics to unlock Guardian controls.
-              </p>
+              <p className="text-xs text-muted-foreground">Use your Google account to open the parent portal.</p>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                onSelectParent()
-                handleClose()
-              }}
-              className="mt-6 flex flex-col gap-4"
-            >
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Password / Passkey</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={parentPass}
-                  onChange={(e) => setParentPass(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-hidden"
-                />
-              </div>
-
-              <Button type="submit" className="w-full">
-                Unlock Parent Dashboard
-              </Button>
-            </form>
+            <Button className="mt-6 w-full" onClick={onSelectParent}>
+              <span aria-hidden="true" className="font-bold">G</span>
+              Continue with Google
+            </Button>
           </div>
         )}
 

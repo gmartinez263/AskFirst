@@ -4,7 +4,7 @@ import { useQuery } from 'deepspace'
 import type { Child } from '@/types/askfirst'
 import { BiometricLoginModal } from '@/components/BiometricLoginModal'
 import { Button } from '@/components/ui/Button'
-import {Link} from "react-router-dom";
+import { Link, useNavigate } from 'react-router-dom'
 
 // Fallback demo children if database has not been seeded yet
 const DEMO_CHILDREN: Child[] = [
@@ -31,6 +31,7 @@ const DEMO_CHILDREN: Child[] = [
 ]
 
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [isBiometricOpen, setIsBiometricOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
 
@@ -65,8 +66,12 @@ export default function LoginPage() {
   }
 
   const handleSelectParent = () => {
-    setSelectedUser('Parent / Guardian')
-    // Destination navigation hook (e.g. navigate('/parent')) will connect here
+    window.location.assign('/api/auth/social-redirect?provider=google&returnTo=%2Fparent')
+  }
+
+  const handleDemoParentShortcut = () => {
+    setIsBiometricOpen(false)
+    navigate('/parent')
   }
 
   return (
@@ -147,7 +152,7 @@ export default function LoginPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSelectParent}
+            onClick={handleDemoParentShortcut}
             className="gap-2 text-xs"
           >
             <Shield className="h-3.5 w-3.5 text-primary" /> Sign In as Parent
