@@ -27,7 +27,7 @@ export default function Landing() {
             <span className="text-xl font-bold tracking-tight">{APP_NAME}</span>
           </div>
           <Link
-            to="/home"
+            to="/login"
             className="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition hover:opacity-90"
           >
             Open App &rarr;
@@ -55,7 +55,7 @@ export default function Landing() {
 
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <Link
-              to="/home"
+              to="/login"
               className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               Get Started with AskFirst
