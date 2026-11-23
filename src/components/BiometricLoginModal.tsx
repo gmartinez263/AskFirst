@@ -48,12 +48,12 @@ export function BiometricLoginModal({
 
     // Auto-verify when 4 digits are entered
     if (nextPin.length === 4 && selectedChild) {
-      const expectedPin = selectedChild.pinCode || '1234'
+      const expectedPin = selectedChild.pinCode
       if (nextPin === expectedPin) {
         onSelectChild(selectedChild)
         handleClose()
       } else {
-        setPinError('Incorrect PIN. (Default demo PIN is 1234)')
+        setPinError(`Incorrect PIN. (Default demo PIN is ${selectedChild.pinCode}) )`)
         setTimeout(() => setPin(''), 600)
       }
     }

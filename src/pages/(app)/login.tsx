@@ -2,33 +2,10 @@ import { useState, useMemo } from 'react'
 import { Fingerprint, Shield, Sparkles, Smartphone } from 'lucide-react'
 import { useQuery } from 'deepspace'
 import type { Child } from '@/types/askfirst'
+import { DEMO_CHILDREN } from '@/demo-data'
 import { BiometricLoginModal } from '@/components/BiometricLoginModal'
 import { Button } from '@/components/ui/Button'
 import { Link, useNavigate } from 'react-router-dom'
-
-// Fallback demo children if database has not been seeded yet
-const DEMO_CHILDREN: Child[] = [
-  {
-    id: 'child_leo',
-    name: 'Leo',
-    age: 10,
-    avatar: '🚀',
-    monthlyAllowance: 25.0,
-    spentThisMonth: 14.5,
-    pinCode: '1234',
-    parentUserId: 'parent_demo_user',
-  },
-  {
-    id: 'child_maya',
-    name: 'Maya',
-    age: 13,
-    avatar: '🎨',
-    monthlyAllowance: 40.0,
-    spentThisMonth: 28.0,
-    pinCode: '5678',
-    parentUserId: 'parent_demo_user',
-  },
-]
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -62,7 +39,7 @@ export default function LoginPage() {
 
   const handleSelectChild = (child: Child) => {
     setSelectedUser(`Child: ${child.name}`)
-    // Destination navigation hook (e.g. navigate('/portal')) will connect here
+    navigate(`/child?profile=${encodeURIComponent(child.id)}`)
   }
 
   const handleSelectParent = () => {

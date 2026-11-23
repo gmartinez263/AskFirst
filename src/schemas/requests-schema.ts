@@ -3,7 +3,10 @@ import type { CollectionSchema } from 'deepspace/schema'
 /**
  * Purchase Requests Collection Schema
  *
- * Purchase requests submitted by children for parent review.
+ * Purchase requests created from a selected child profile for parent review.
+ * `childId` remains bound to the authenticated account (the parent in the
+ * single-family prototype); `childProfileId` identifies which child profile
+ * the request belongs to.
  * - Admin (Parent): Full CRUD access to review, approve, deny, add notes, and trigger checkout.
  * - Member (Child): Can create new requests and edit/delete their own pending requests.
  *   `writableFields` ensures children cannot manipulate `status`, `parentNote`, or `reviewedAt`.
@@ -17,6 +20,12 @@ export const requestsSchema: CollectionSchema = {
       interpretation: 'plain',
       userBound: true,
       immutable: true,
+      required: true,
+    },
+    {
+      name: 'childProfileId',
+      storage: 'text',
+      interpretation: 'plain',
       required: true,
     },
     { name: 'childName', storage: 'text', interpretation: 'plain', required: true },
