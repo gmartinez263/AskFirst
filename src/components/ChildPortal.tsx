@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useAuth, useMutations, useQuery } from 'deepspace'
 import type { Child, PurchaseRequest, RequestCategory, RequestStatus } from '@/types/askfirst'
 import { DEMO_CHILDREN } from '@/demo-data'
+import { approvedAmountThisMonth } from '@/lib/allowance'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -76,7 +77,7 @@ export default function ChildPortal({ childProfileId }: ChildPortalProps) {
   }))
 
   const allowance = Math.max(0, child?.monthlyAllowance ?? 0)
-  const spent = Math.max(0, child?.spentThisMonth ?? 0)
+  const spent = Math.max(0, child?.spentThisMonth ?? 0) + (childProfileId ? approvedAmountThisMonth(requests, childProfileId) : 0)
   const remaining = Math.max(0, allowance - spent)
   const spentPercent = allowance > 0 ? Math.min(100, (spent / allowance) * 100) : 0
 
@@ -168,11 +169,11 @@ export default function ChildPortal({ childProfileId }: ChildPortalProps) {
             <p className="text-sm text-muted-foreground">Monthly allowance</p>
             <h2 id="allowance-heading" className="mt-1 text-2xl font-bold tabular-nums">${remaining.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">left</span></h2>
           </div>
-          <p className="text-sm tabular-nums text-muted-foreground">${spent.toFixed(2)} spent of ${allowance.toFixed(2)}</p>
+          <p className="text-sm tabular-nums text-muted-foreground">${spent.toFixed(2)} used (spent + approved) of ${allowance.toFixed(2)}</p>
         </div>
         <div
           role="progressbar"
-          aria-label="Monthly allowance spent"
+          aria-label="Monthly allowance used, including approved requests"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(spentPercent)}

@@ -1,12 +1,18 @@
-import { useState } from 'react'
-import { ArrowUpRight, Check, Clock3, ExternalLink, LoaderCircle, ShieldAlert, Sparkles, X } from 'lucide-react'
-import { getAuthToken, useMutations, useQuery } from 'deepspace'
-import type { AiReview, PurchaseRequest, RequestStatus } from '@/types/askfirst'
+import { useState, type FormEvent } from 'react'
+import { ArrowUpRight, Check, Clock3, ExternalLink, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Sparkles, Users, X } from 'lucide-react'
+import { getAuthToken, useAuth, useMutations, useQuery } from 'deepspace'
+import type { AiReview, Child, PurchaseRequest, RequestStatus } from '@/types/askfirst'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
+import { approvedAmountThisMonth } from '@/lib/allowance'
 
 type RequestRecord = Omit<PurchaseRequest, 'id' | 'createdAt' | 'updatedAt'>
+type ChildRecord = Omit<Child, 'id' | 'createdAt' | 'updatedAt'>
+
+const childAvatars = ['🚀', '🎨', '🦊', '🐼', '🐸', '🦄', '🐙', '🐯']
 
 const statusLabels: Record<RequestStatus, string> = {
   pending: 'Waiting for you',
@@ -33,6 +39,7 @@ const severityVariants: Record<AiReview['severity'], 'success' | 'warning' | 'de
 }
 
 export default function ParentPortal() {
+  const { userId } = useAuth()
   const { records = [], status, error } = useQuery<PurchaseRequest>('requests', {
     orderBy: 'createdAt',
     orderDir: 'desc',
@@ -41,7 +48,16 @@ export default function ParentPortal() {
     orderBy: 'evaluatedAt',
     orderDir: 'desc',
   })
+  const { records: childRecords = [], status: childrenStatus, error: childrenError } = useQuery<Child>('children', {
+    orderBy: 'createdAt',
+    orderDir: 'asc',
+  })
   const { putConfirmed, ready } = useMutations<RequestRecord>('requests')
+  const {
+    createConfirmed: createChildConfirmed,
+    putConfirmed: updateChildConfirmed,
+    ready: childrenReady,
+  } = useMutations<ChildRecord>('children')
   const [activeRequest, setActiveRequest] = useState<string | null>(null)
   const [parentNote, setParentNote] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -49,6 +65,18 @@ export default function ParentPortal() {
   const [assessingId, setAssessingId] = useState<string | null>(null)
   const [assessmentError, setAssessmentError] = useState<{ requestId: string; message: string } | null>(null)
   const [assessmentOverrides, setAssessmentOverrides] = useState<Record<string, AiReview>>({})
+  const [isAddChildOpen, setIsAddChildOpen] = useState(false)
+  const [isAddingChild, setIsAddingChild] = useState(false)
+  const [childFormError, setChildFormError] = useState<string | null>(null)
+  const [childName, setChildName] = useState('')
+  const [childAge, setChildAge] = useState('')
+  const [childAvatar, setChildAvatar] = useState(childAvatars[0])
+  const [childPin, setChildPin] = useState('')
+  const [childAllowance, setChildAllowance] = useState('25')
+  const [editingAllowanceId, setEditingAllowanceId] = useState<string | null>(null)
+  const [allowanceDraft, setAllowanceDraft] = useState('')
+  const [savingAllowanceId, setSavingAllowanceId] = useState<string | null>(null)
+  const [allowanceError, setAllowanceError] = useState<string | null>(null)
 
   const requests = records.map((record) => ({
     ...record.data,
@@ -56,6 +84,18 @@ export default function ParentPortal() {
     createdAt: record.createdAt,
   }))
   const pendingCount = requests.filter((request) => request.status === 'pending').length
+  const children = childRecords.map((record) => ({
+    ...record.data,
+    id: record.recordId,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  }))
+  const totalAllowance = children.reduce((total, child) => total + Math.max(0, Number(child.monthlyAllowance) || 0), 0)
+  const spendingByChild = new Map(children.map((child) => [
+    child.id,
+    Math.max(0, Number(child.spentThisMonth) || 0) + approvedAmountThisMonth(requests, child.id),
+  ]))
+  const totalSpent = [...spendingByChild.values()].reduce((total, spent) => total + spent, 0)
   const assessments = new Map<string, AiReview>([
     ...reviewRecords.map((record) => [record.data.requestId, { ...record.data, id: record.recordId }] as const),
     ...Object.entries(assessmentOverrides),
@@ -129,6 +169,75 @@ export default function ParentPortal() {
     }
   }
 
+  const resetChildForm = () => {
+    setChildName('')
+    setChildAge('')
+    setChildAvatar(childAvatars[0])
+    setChildPin('')
+    setChildAllowance('25')
+    setChildFormError(null)
+  }
+
+  const addChild = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const age = Number(childAge)
+    const allowance = Number(childAllowance)
+    if (!userId) {
+      setChildFormError('Your parent account is not ready. Please sign in again.')
+      return
+    }
+    if (!Number.isInteger(age) || age < 1 || age > 17) {
+      setChildFormError('Enter an age between 1 and 17.')
+      return
+    }
+    if (!Number.isFinite(allowance) || allowance < 0) {
+      setChildFormError('Enter an allowance of $0 or more.')
+      return
+    }
+    if (!/^\d{4,6}$/.test(childPin)) {
+      setChildFormError('PIN must contain 4 to 6 digits.')
+      return
+    }
+
+    setIsAddingChild(true)
+    setChildFormError(null)
+    try {
+      await createChildConfirmed({
+        name: childName.trim(),
+        age,
+        avatar: childAvatar,
+        monthlyAllowance: allowance,
+        spentThisMonth: 0,
+        pinCode: childPin,
+        parentUserId: userId,
+      })
+      resetChildForm()
+      setIsAddChildOpen(false)
+    } catch (cause) {
+      setChildFormError(cause instanceof Error ? cause.message : 'Could not add this child profile. Please try again.')
+    } finally {
+      setIsAddingChild(false)
+    }
+  }
+
+  const saveAllowance = async (child: Child) => {
+    const allowance = Number(allowanceDraft)
+    if (!Number.isFinite(allowance) || allowance < 0) {
+      setAllowanceError('Enter an allowance of $0 or more.')
+      return
+    }
+    setSavingAllowanceId(child.id)
+    setAllowanceError(null)
+    try {
+      await updateChildConfirmed(child.id, { monthlyAllowance: allowance })
+      setEditingAllowanceId(null)
+    } catch (cause) {
+      setAllowanceError(cause instanceof Error ? cause.message : 'Could not update the allowance. Please try again.')
+    } finally {
+      setSavingAllowanceId(null)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8">
       <header className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-end sm:justify-between">
@@ -149,6 +258,142 @@ export default function ParentPortal() {
           </div>
         </div>
       </header>
+
+      <section aria-labelledby="family-heading" className="mt-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Household</p>
+            <h2 id="family-heading" className="mt-1 text-xl font-semibold">Children & allowances</h2>
+          </div>
+          <Button onClick={() => { resetChildForm(); setIsAddChildOpen(true) }}>
+            <Plus className="h-4 w-4" aria-hidden="true" /> Add child profile
+          </Button>
+        </div>
+
+        {childrenStatus === 'loading' && (
+          <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl border border-border bg-card px-5 py-10 text-sm text-muted-foreground">
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading child profiles…
+          </div>
+        )}
+        {childrenStatus === 'error' && (
+          <div role="alert" className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+            Could not load child profiles{childrenError ? `: ${childrenError}` : '.'}
+          </div>
+        )}
+        {childrenStatus === 'ready' && children.length > 0 && (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-sm text-muted-foreground">Family monthly budget</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">${totalAllowance.toFixed(2)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-sm text-muted-foreground">Allowance used (spent + approved)</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">${totalSpent.toFixed(2)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-sm text-muted-foreground">Child profiles</p>
+                <p className="mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums"><Users className="h-5 w-5 text-primary" aria-hidden="true" />{children.length}</p>
+              </div>
+            </div>
+            {allowanceError && <p role="alert" className="mt-3 text-sm text-destructive">{allowanceError}</p>}
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {children.map((child) => {
+                const isEditing = editingAllowanceId === child.id
+                const isSaving = savingAllowanceId === child.id
+                return (
+                  <article key={child.id} className="rounded-2xl border border-border bg-card p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-2xl" aria-hidden="true">{child.avatar || '🚀'}</span>
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold">{child.name}</h3>
+                          <p className="text-sm text-muted-foreground">Age {child.age}</p>
+                        </div>
+                      </div>
+                      {!isEditing && (
+                        <Button variant="outline" size="sm" onClick={() => { setEditingAllowanceId(child.id); setAllowanceDraft(String(child.monthlyAllowance)); setAllowanceError(null) }}>
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit budget
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-5 border-t border-border pt-4">
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Monthly allowance</p>
+                          {isEditing ? (
+                            <label className="mt-1 flex items-center gap-2">
+                              <span className="text-sm">$</span>
+                              <Input autoFocus type="number" min="0" step="0.01" aria-label={`${child.name} monthly allowance`} className="h-9 w-36" value={allowanceDraft} onChange={(event) => setAllowanceDraft(event.target.value)} />
+                            </label>
+                          ) : (
+                            <p className="mt-1 text-lg font-semibold tabular-nums">${Number(child.monthlyAllowance).toFixed(2)}</p>
+                          )}
+                        </div>
+                        <p className="text-sm tabular-nums text-muted-foreground">${(spendingByChild.get(child.id) ?? 0).toFixed(2)} used</p>
+                      </div>
+                      {isEditing && (
+                        <div className="mt-3 flex gap-2">
+                          <Button size="sm" disabled={!childrenReady || isSaving} loading={isSaving} onClick={() => void saveAllowance(child)}><Save className="h-3.5 w-3.5" aria-hidden="true" /> Save budget</Button>
+                          <Button size="sm" variant="ghost" disabled={isSaving} onClick={() => { setEditingAllowanceId(null); setAllowanceError(null) }}>Cancel</Button>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </>
+        )}
+        {childrenStatus === 'ready' && children.length === 0 && (
+          <div className="mt-4 rounded-2xl border border-dashed border-border bg-card/50 px-6 py-10 text-center">
+            <p className="font-medium">No saved child profiles yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">Add a profile to set a PIN and monthly allowance for a child.</p>
+          </div>
+        )}
+      </section>
+
+      <Modal open={isAddChildOpen} onClose={() => { if (!isAddingChild) setIsAddChildOpen(false) }} aria-label="Add child profile">
+        <div className="p-6 text-foreground">
+          <h2 className="text-xl font-bold">Add a child profile</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Set up the profile, sign-in PIN, and monthly allowance.</p>
+          <form onSubmit={(event) => void addChild(event)} className="mt-5 flex flex-col gap-4">
+            <div>
+              <label htmlFor="child-name" className="text-sm font-medium">Child’s name</label>
+              <Input id="child-name" required maxLength={60} className="mt-1.5" placeholder="Name" value={childName} onChange={(event) => setChildName(event.target.value)} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="child-age" className="text-sm font-medium">Age</label>
+                <Input id="child-age" type="number" min="1" max="17" step="1" required className="mt-1.5" value={childAge} onChange={(event) => setChildAge(event.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="child-pin" className="text-sm font-medium">Sign-in PIN</label>
+                <Input id="child-pin" type="password" inputMode="numeric" autoComplete="new-password" pattern="[0-9]{4,6}" minLength={4} maxLength={6} required className="mt-1.5" placeholder="4–6 digits" value={childPin} onChange={(event) => setChildPin(event.target.value.replace(/\D/g, '').slice(0, 6))} />
+              </div>
+            </div>
+            <fieldset>
+              <legend className="text-sm font-medium">Choose an avatar</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {childAvatars.map((avatar) => (
+                  <button key={avatar} type="button" aria-label={`Use ${avatar} avatar`} aria-pressed={childAvatar === avatar} onClick={() => setChildAvatar(avatar)} className={`flex h-10 w-10 items-center justify-center rounded-xl border text-xl ${childAvatar === avatar ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}>
+                    {avatar}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <div>
+              <label htmlFor="child-allowance" className="text-sm font-medium">Monthly allowance</label>
+              <div className="mt-1.5 flex items-center gap-2"><span aria-hidden="true">$</span><Input id="child-allowance" type="number" min="0" step="0.01" required className="max-w-48" value={childAllowance} onChange={(event) => setChildAllowance(event.target.value)} /></div>
+            </div>
+            {childFormError && <p role="alert" className="text-sm text-destructive">{childFormError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" disabled={isAddingChild} onClick={() => setIsAddChildOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!childrenReady || isAddingChild} loading={isAddingChild}>Create profile</Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
 
       <section aria-label="Purchase request list" className="mt-8">
         {status === 'loading' && (
