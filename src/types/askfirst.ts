@@ -29,7 +29,10 @@ export type RequestStatus = 'pending' | 'approved' | 'denied'
 
 export interface PurchaseRequest {
   id: string
+  /** Authenticated account ID (parent for this single-family prototype). */
   childId: string
+  /** Profile selected by the child PIN. Optional for older request rows. */
+  childProfileId?: string
   childName: string
   title: string
   url: string
