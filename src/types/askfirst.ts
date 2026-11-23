@@ -60,6 +60,10 @@ export interface AiReview {
   hiddenCostsWarning?: string
   oneLineVerdict: string
   suggestedAlternative?: string
+  /** What the web lookup found, or why it could not verify the product page. */
+  researchNote?: string
+  /** JSON-encoded array of title/URL citations returned by Exa. */
+  sourceLinksJson?: string
   confidence?: 'high' | 'moderate' | 'low'
   evaluatedAt?: string
   createdAt?: string
