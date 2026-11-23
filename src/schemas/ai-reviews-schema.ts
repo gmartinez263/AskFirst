@@ -38,6 +38,8 @@ export const aiReviewsSchema: CollectionSchema = {
     { name: 'hiddenCostsWarning', storage: 'text', interpretation: 'plain' },
     { name: 'oneLineVerdict', storage: 'text', interpretation: 'plain', required: true },
     { name: 'suggestedAlternative', storage: 'text', interpretation: 'plain' },
+    { name: 'researchNote', storage: 'text', interpretation: 'plain' },
+    { name: 'sourceLinksJson', storage: 'text', interpretation: 'plain' },
     {
       name: 'confidence',
       storage: 'text',
