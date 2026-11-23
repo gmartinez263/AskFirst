@@ -539,7 +539,7 @@ function AiAssessmentPanel({
   canAssess: boolean
   onAssess: () => void
 }) {
-  const hasWebAssessment = review?.status === 'completed' && Boolean(review.researchNote)
+  const hasWebAssessment = isValidWebAssessment(review)
   const sources = parseReviewSources(review?.sourceLinksJson)
 
   return (
@@ -595,7 +595,7 @@ function AiAssessmentPanel({
         <div className="mt-2">
           <p className="text-sm leading-5 text-muted-foreground">
             {review?.status === 'completed'
-              ? 'The saved assessment has no web research. Run it again to look up the item and show its sources.'
+              ? 'The saved assessment is incomplete or invalid. Run the research again to generate a complete result.'
               : reviewsStatus === 'loading'
               ? 'Loading assessment…'
               : reviewsStatus === 'error'
@@ -619,6 +619,23 @@ function AiAssessmentPanel({
         </div>
       )}
     </section>
+  )
+}
+
+function isValidWebAssessment(review: AiReview | undefined): boolean {
+  return Boolean(
+    review?.status === 'completed' &&
+    review.researchNote?.trim() &&
+    ['safe', 'caution', 'warning'].includes(review.severity) &&
+    review.ageRating?.trim() &&
+    review.ageSuitabilitySummary?.trim() &&
+    review.hiddenCostsWarning?.trim() &&
+    review.oneLineVerdict?.trim() &&
+    review.suggestedAlternative?.trim() &&
+    ['high', 'moderate', 'low'].includes(review.confidence ?? '') &&
+    !review.oneLineVerdict.startsWith('The AI response was incomplete;') &&
+    !review.ageSuitabilitySummary.startsWith('The AI response was incomplete;') &&
+    review.hiddenCostsWarning !== 'Could not verify hidden costs; check the merchant or app listing.',
   )
 }
 
