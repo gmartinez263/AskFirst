@@ -39,6 +39,16 @@ export default function ParentPortal() {
   const pendingCount = requests.filter((request) => request.status === 'pending').length
 
   const decide = async (request: PurchaseRequest, decision: 'approved' | 'denied') => {
+    const checkoutUrl = decision === 'approved' ? getHttpCheckoutUrl(request.checkoutUrl || request.url) : null
+    // Open the tab during the click gesture so popup blockers allow it. It only
+    // navigates to the store after the approval has been saved successfully.
+    const checkoutWindow = checkoutUrl ? window.open('about:blank', '_blank') : null
+    if (checkoutWindow) {
+      checkoutWindow.opener = null
+      checkoutWindow.document.title = 'Approval in progress'
+      checkoutWindow.document.body.textContent = 'AskFirst is saving the approval. The checkout page will open when it is complete.'
+    }
+
     setSavingId(request.id)
     setActionError(null)
     try {
@@ -47,9 +57,18 @@ export default function ParentPortal() {
         parentNote: parentNote.trim() || undefined,
         reviewedAt: new Date().toISOString(),
       })
+      if (checkoutUrl) {
+        if (checkoutWindow && !checkoutWindow.closed) {
+          checkoutWindow.location.replace(checkoutUrl)
+        } else {
+          // A blocked popup still gets the parent to checkout after approval.
+          window.location.assign(checkoutUrl)
+        }
+      }
       setActiveRequest(null)
       setParentNote('')
     } catch (cause) {
+      checkoutWindow?.close()
       setActionError(cause instanceof Error ? cause.message : 'Could not save your decision. Please try again.')
     } finally {
       setSavingId(null)
@@ -179,4 +198,14 @@ export default function ParentPortal() {
       </section>
     </div>
   )
+}
+
+function getHttpCheckoutUrl(value: string | undefined): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null
+  } catch {
+    return null
+  }
 }
