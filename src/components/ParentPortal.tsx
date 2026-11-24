@@ -467,7 +467,7 @@ export default function ParentPortal() {
                   isAssessing={assessingId === request.id}
                   isBusy={assessingId !== null}
                   error={assessmentError?.requestId === request.id ? assessmentError.message : null}
-                  canAssess={isPending}
+                  decisionMade={!isPending}
                   onAssess={() => void assessRequest(request.id)}
                 />
 
@@ -541,7 +541,7 @@ function AiAssessmentPanel({
   isAssessing,
   isBusy,
   error,
-  canAssess,
+  decisionMade,
   onAssess,
 }: {
   review: AiReview | undefined
@@ -550,7 +550,7 @@ function AiAssessmentPanel({
   isAssessing: boolean
   isBusy: boolean
   error: string | null
-  canAssess: boolean
+  decisionMade: boolean
   onAssess: () => void
 }) {
   const hasWebAssessment = isValidWebAssessment(review)
@@ -616,20 +616,23 @@ function AiAssessmentPanel({
                 ? `Could not load saved assessments${reviewsError ? `: ${reviewsError}` : '.'}`
                 : 'No assessment yet. Ask AI to research the item and prepare a cautious, age-aware summary. This uses DeepSpace credits; you make the final decision.'}
           </p>
-          {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
-          {canAssess && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              disabled={isBusy}
-              loading={isAssessing}
-              onClick={onAssess}
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              {isAssessing ? 'Researching and assessing…' : review?.status === 'failed' ? 'Retry assessment' : review?.status === 'completed' ? 'Run web-backed assessment' : 'Research with AI'}
-            </Button>
+          {decisionMade && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              This assessment will be generated after the request was approved or denied and won’t change that decision.
+            </p>
           )}
+          {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            disabled={isBusy}
+            loading={isAssessing}
+            onClick={onAssess}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {isAssessing ? 'Researching and assessing…' : review?.status === 'failed' ? 'Retry assessment' : review?.status === 'completed' ? 'Run web-backed assessment' : 'Research with AI'}
+          </Button>
         </div>
       )}
     </section>

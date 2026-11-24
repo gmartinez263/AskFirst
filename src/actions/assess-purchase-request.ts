@@ -74,10 +74,6 @@ export const assessPurchaseRequest: ActionHandler<Env> = async ({
   if (!request || request.childId !== userId) {
     return { success: false, error: 'This request does not belong to your family.' }
   }
-  if (request.status !== 'pending') {
-    return { success: false, error: 'Only pending requests can be assessed.' }
-  }
-
   const existingResult = await tools.query<Assessment & {
     requestId: string
     status: string
