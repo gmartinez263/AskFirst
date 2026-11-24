@@ -78,18 +78,26 @@ export default function ParentPortal() {
   const [savingAllowanceId, setSavingAllowanceId] = useState<string | null>(null)
   const [allowanceError, setAllowanceError] = useState<string | null>(null)
 
-  const requests = records.map((record) => ({
-    ...record.data,
-    id: record.recordId,
-    createdAt: record.createdAt,
-  }))
-  const pendingCount = requests.filter((request) => request.status === 'pending').length
   const children = childRecords.map((record) => ({
     ...record.data,
     id: record.recordId,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }))
+  const savedChildProfileIds = new Set(children.map((child) => child.id))
+  const requests = childrenStatus === 'ready'
+    ? records
+        .filter((record) => {
+          const childProfileId = record.data.childProfileId
+          return childProfileId !== undefined && savedChildProfileIds.has(childProfileId)
+        })
+        .map((record) => ({
+          ...record.data,
+          id: record.recordId,
+          createdAt: record.createdAt,
+        }))
+    : []
+  const pendingCount = requests.filter((request) => request.status === 'pending').length
   const totalAllowance = children.reduce((total, child) => total + Math.max(0, Number(child.monthlyAllowance) || 0), 0)
   const spendingByChild = new Map(children.map((child) => [
     child.id,
@@ -396,7 +404,7 @@ export default function ParentPortal() {
       </Modal>
 
       <section aria-label="Purchase request list" className="mt-8">
-        {status === 'loading' && (
+        {(status === 'loading' || childrenStatus === 'loading') && (
           <div className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card px-5 py-16 text-sm text-muted-foreground">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading family requests…
           </div>
@@ -408,7 +416,13 @@ export default function ParentPortal() {
           </div>
         )}
 
-        {status === 'ready' && requests.length === 0 && (
+        {status === 'ready' && childrenStatus === 'error' && (
+          <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+            Could not verify child profiles, so requests are hidden until the profiles load successfully.
+          </div>
+        )}
+
+        {status === 'ready' && childrenStatus === 'ready' && requests.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
               <ShieldAlert className="h-5 w-5" aria-hidden="true" />
